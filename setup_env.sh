@@ -6,5 +6,5 @@
 
 conda env create --file=environment.yaml
 conda init bash
-source activate mechafil_jax
+source activate cel
 pip install --no-deps -e . 

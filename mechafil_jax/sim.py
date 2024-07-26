@@ -112,6 +112,9 @@ def run_sim(
     rb_day_renewed_power_pib = jnp.concatenate((historical_renewed_rb_power_pib, (rb_power_forecast["renewed_power"][:-1])))
     qa_day_onboarded_power_pib = jnp.concatenate([historical_onboarded_qa_power_pib, qa_power_forecast["onboarded_power"][:-1]])
     qa_day_renewed_power_pib = jnp.concatenate([historical_renewed_qa_power_pib, qa_power_forecast["renewed_power"][:-1]])
+    
+    # rb_sched_expire_power_pib = jnp.concatenate([rb_known_scheduled_expire_vec, rb_power_forecast["expire_scheduled_power"][:-1]])
+    # qa_sched_expire_power_pib = jnp.concatenate([qa_known_scheduled_expire_vec, qa_power_forecast["expire_scheduled_power"][:-1]])
 
     #################################################
 
@@ -185,6 +188,8 @@ def run_sim(
         "rb_day_renewed_power_pib": rb_day_renewed_power_pib,
         "qa_day_onboarded_power_pib": qa_day_onboarded_power_pib,
         "qa_day_renewed_power_pib": qa_day_renewed_power_pib,
+        "rb_sched_expire_power_pib": rb_power_forecast["expire_scheduled_power"],
+        "qa_sched_expire_power_pib": qa_power_forecast["expire_scheduled_power"],
         "full_renewal_rate": full_renewal_rate_vec,
         **vesting_forecast,
         **minting_forecast,
