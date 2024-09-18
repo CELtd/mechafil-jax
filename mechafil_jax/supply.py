@@ -36,9 +36,35 @@ def passthrough(arggs):
     return cur_day_gas_burn
 
 @jax.jit
+def _use_cs(arggs):
+    cs_dict, day_idx = arggs
+    circ_supply = (
+        cs_dict["disbursed_reserve"][day_idx]  # from initialise_circulating_supply_df
+        + cs_dict["cum_network_reward"][day_idx]  # from the minting_model
+        + cs_dict["total_vest"][day_idx]  # from vesting_model
+        - cs_dict["network_locked"][day_idx]  # from simulation loop
+        - cs_dict["network_gas_burn"][day_idx]  # comes from user inputs
+    )
+    return circ_supply
+
+@jax.jit
+def _use_as(arggs):
+    cs_dict, day_idx = arggs
+    # as = cs + locked
+    available_supply = (
+        cs_dict["disbursed_reserve"][day_idx]  # from initialise_circulating_supply_df
+        + cs_dict["cum_network_reward"][day_idx]  # from the minting_model
+        + cs_dict["total_vest"][day_idx]  # from vesting_model
+        - cs_dict["network_gas_burn"][day_idx]  # comes from user inputs
+    )
+    return available_supply
+
+@jax.jit
 def update_cs_day(carry, x):
     # Compute daily change in initial pledge collateral
-    day_idx, current_day_idx, cs_dict, known_scheduled_pledge_release_vec, circ_supply, daily_burnt_fil, len_burnt_fil_vec, renewal_rate_vec, duration, lock_target, gamma_vec, gamma_weight_type_vec = carry
+    day_idx, current_day_idx, cs_dict, known_scheduled_pledge_release_vec, circ_supply, \
+        daily_burnt_fil, len_burnt_fil_vec, renewal_rate_vec, duration, lock_target, \
+        gamma_vec, gamma_weight_type_vec, use_available_supply = carry
 
     day_pledge_locked_vec = cs_dict["day_locked_pledge"]
     scheduled_pledge_release = get_day_schedule_pledge_release(
@@ -108,12 +134,18 @@ def update_cs_day(carry, x):
     cs_dict["network_gas_burn"] = cs_dict["network_gas_burn"].at[day_idx].set(gas_burn_val)
 
     # Find circulating supply balance and update
-    circ_supply = (
-        cs_dict["disbursed_reserve"][day_idx]  # from initialise_circulating_supply_df
-        + cs_dict["cum_network_reward"][day_idx]  # from the minting_model
-        + cs_dict["total_vest"][day_idx]  # from vesting_model
-        - cs_dict["network_locked"][day_idx]  # from simulation loop
-        - cs_dict["network_gas_burn"][day_idx]  # comes from user inputs
+    # circ_supply = (
+    #     cs_dict["disbursed_reserve"][day_idx]  # from initialise_circulating_supply_df
+    #     + cs_dict["cum_network_reward"][day_idx]  # from the minting_model
+    #     + cs_dict["total_vest"][day_idx]  # from vesting_model
+    #     - cs_dict["network_locked"][day_idx]  # from simulation loop
+    #     - cs_dict["network_gas_burn"][day_idx]  # comes from user inputs
+    # )
+    circ_supply = lax.cond(
+        use_available_supply,
+        _use_as,
+        _use_cs,
+        (cs_dict, day_idx)
     )
     circ_supply = jnp.maximum(circ_supply, 0)
     cs_dict["circ_supply"] = cs_dict["circ_supply"].at[day_idx].set(circ_supply)
@@ -131,6 +163,7 @@ def update_cs_day(carry, x):
         lock_target,
         gamma_vec,
         gamma_weight_type_vec,
+        use_available_supply,
     )
     return (return_carry, None)
 
@@ -151,6 +184,7 @@ def forecast_circulating_supply(
     lock_target: Union[jnp.array, NDArray],
     gamma: Union[jnp.array, NDArray],
     gamma_weight_type: Union[jnp.array, NDArray],
+    use_available_supply: bool = False,
 ) -> Dict:
     # we assume all stats started at main net launch, in 2020-10-15
     start_day = datetime64_delta_to_days(start_date - NETWORK_START)
@@ -175,7 +209,7 @@ def forecast_circulating_supply(
     current_day_idx = current_day - start_day
     init_in = (day_idx_start, current_day_idx, cs_dict, known_scheduled_pledge_release_vec, 
                circ_supply, daily_burnt_fil, len(burnt_fil_vec), renewal_rate_vec, duration, 
-               lock_target, gamma, gamma_weight_type)
+               lock_target, gamma, gamma_weight_type, use_available_supply)
     ret, _ = lax.scan(update_cs_day, init_in, None, length=sim_len)
     # ret, _ = imitate_lax.scan(update_cs_day, init_in, None, length=sim_len-1)  # for debugging and seeing print statements
     cs_dict = ret[2]
