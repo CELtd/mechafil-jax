@@ -11,13 +11,14 @@ import pystarboard.data as data
 import mechafil.data as mecha_data  # remove this and associated code once we remove this from mechafil
 
 import numpy as np
+import argparse
 
 class TestVesting(unittest.TestCase):
     def test_vesting(self):
         # setup data access
         # TODO: better way to do this?
-        data.setup_spacescope('/Users/kiran/code/filecoin-mecha-twin/kiran_spacescope_auth.json')
-        mecha_data.setup_spacescope('/Users/kiran/code/filecoin-mecha-twin/kiran_spacescope_auth.json')
+        data.setup_spacescope('/home/kiran/code/cel/auth/spacescope_auth.json')
+        mecha_data.setup_spacescope('/home/kiran/code/cel/auth/spacescope_auth.json')
 
         start_date = date(2021, 3, 16)
         forecast_length = 5*365

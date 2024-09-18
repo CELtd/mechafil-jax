@@ -1,4 +1,4 @@
-name: mechafil_jax
+name: cel
 channels:
   - conda-forge
 dependencies:
