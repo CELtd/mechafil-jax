@@ -33,6 +33,7 @@ def run_sim(
     qa_renew_relative_multiplier_vec: jnp.array = 1.0,
     gamma: Union[float, jnp.array] = 1.0,
     gamma_weight_type: Union[int, jnp.array] = 0,
+    use_available_supply: bool = False,
 ):
     """
     Run a simulation of the Filecoin network.
@@ -178,6 +179,7 @@ def run_sim(
         lock_target=full_lock_target_vec,
         gamma=full_gamma_vec,
         gamma_weight_type=full_gamma_weight_type_vec,
+        use_available_supply=use_available_supply,
     )
 
     # collate results
