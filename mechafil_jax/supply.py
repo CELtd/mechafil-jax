@@ -120,7 +120,7 @@ def update_cs_day(carry, x):
         cs_dict["network_locked_reward"][day_idx - 1] + reward_delta
     )
     cs_dict["network_locked"] = cs_dict["network_locked"].at[day_idx].set(
-        cs_dict["network_locked"][day_idx - 1] + pledge_delta + reward_delta
+        jnp.maximum(cs_dict["network_locked"][day_idx - 1] + pledge_delta + reward_delta, 0)
     )
     
     # Update gas burnt
@@ -134,13 +134,6 @@ def update_cs_day(carry, x):
     cs_dict["network_gas_burn"] = cs_dict["network_gas_burn"].at[day_idx].set(gas_burn_val)
 
     # Find circulating supply balance and update
-    # circ_supply = (
-    #     cs_dict["disbursed_reserve"][day_idx]  # from initialise_circulating_supply_df
-    #     + cs_dict["cum_network_reward"][day_idx]  # from the minting_model
-    #     + cs_dict["total_vest"][day_idx]  # from vesting_model
-    #     - cs_dict["network_locked"][day_idx]  # from simulation loop
-    #     - cs_dict["network_gas_burn"][day_idx]  # comes from user inputs
-    # )
     circ_supply = lax.cond(
         use_available_supply,
         _use_as,
