@@ -1,3 +1,4 @@
+import os
 import unittest
 from datetime import date, timedelta
 
@@ -19,8 +20,8 @@ class TestMinting(unittest.TestCase):
     def test_forecast_minting_stats(self):
         # setup data access
         # TODO: better way to do this?
-        data.setup_spacescope('/home/kiran/code/cel/auth/spacescope_auth.json')
-        mecha_data.setup_spacescope('/home/kiran/code/cel/auth/spacescope_auth.json')
+        data.setup_spacescope(os.path.join(os.environ['HOME'],'code/cel/auth/spacescope_auth.json'))
+        mecha_data.setup_spacescope(os.path.join(os.environ['HOME'],'code/cel/auth/spacescope_auth.json'))
 
         forecast_length = 360*2
         start_date = date(2021, 3, 16)

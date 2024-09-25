@@ -1,3 +1,4 @@
+import os
 import unittest
 from datetime import date, timedelta
 
@@ -24,8 +25,8 @@ class TestSupply(unittest.TestCase):
     def test_forecast_supply(self):
         # setup data access
         # TODO: better way to do this?
-        data.setup_spacescope('/home/kiran/code/cel/auth/spacescope_auth.json')
-        mecha_data.setup_spacescope('/home/kiran/code/cel/auth/spacescope_auth.json')
+        data.setup_spacescope(os.path.join(os.environ['HOME'],'code/cel/auth/spacescope_auth.json'))
+        mecha_data.setup_spacescope(os.path.join(os.environ['HOME'],'code/cel/auth/spacescope_auth.json'))
 
         forecast_length = 360*2
         start_date = date(2021, 3, 16)
@@ -74,6 +75,7 @@ class TestSupply(unittest.TestCase):
         )
         # Forecast Vesting
         vest_df = np_vesting.compute_vesting_trajectory_df(start_date, end_date)
+
         # Forecast minting stats and baseline
         rb_total_power_eib = power_df["total_raw_power_eib"].values
         qa_total_power_eib = power_df["total_qa_power_eib"].values

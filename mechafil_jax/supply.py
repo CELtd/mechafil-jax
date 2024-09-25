@@ -35,36 +35,70 @@ def passthrough(arggs):
     cur_day_gas_burn, prev_day_gas_burn, daily_burnt_fil = arggs
     return cur_day_gas_burn
 
+# @jax.jit
+# def _use_cs(arggs):
+#     cs_dict, day_idx = arggs
+#     circ_supply = (
+#         cs_dict["disbursed_reserve"][day_idx]  # from initialise_circulating_supply_df
+#         + cs_dict["cum_network_reward"][day_idx]  # from the minting_model
+#         + cs_dict["total_vest"][day_idx]  # from vesting_model
+#         - cs_dict["network_locked"][day_idx]  # from simulation loop
+#         - cs_dict["network_gas_burn"][day_idx]  # comes from user inputs
+#     )
+#     return circ_supply
+
+# @jax.jit
+# def _use_as(arggs):
+#     cs_dict, day_idx = arggs
+#     # as = cs + locked
+#     available_supply = (
+#         cs_dict["disbursed_reserve"][day_idx]  # from initialise_circulating_supply_df
+#         + cs_dict["cum_network_reward"][day_idx]  # from the minting_model
+#         + cs_dict["total_vest"][day_idx]  # from vesting_model
+#         - cs_dict["network_gas_burn"][day_idx]  # comes from user inputs
+#     )
+#     return available_supply
 @jax.jit
 def _use_cs(arggs):
     cs_dict, day_idx = arggs
-    circ_supply = (
-        cs_dict["disbursed_reserve"][day_idx]  # from initialise_circulating_supply_df
-        + cs_dict["cum_network_reward"][day_idx]  # from the minting_model
-        + cs_dict["total_vest"][day_idx]  # from vesting_model
-        - cs_dict["network_locked"][day_idx]  # from simulation loop
-        - cs_dict["network_gas_burn"][day_idx]  # comes from user inputs
-    )
-    return circ_supply
+    # circ_supply = (
+    #     cs_dict["disbursed_reserve"][day_idx]  # from initialise_circulating_supply_df
+    #     + cs_dict["cum_network_reward"][day_idx]  # from the minting_model
+    #     + cs_dict["total_vest"][day_idx]  # from vesting_model
+    #     - cs_dict["network_locked"][day_idx]  # from simulation loop
+    #     - cs_dict["network_gas_burn"][day_idx]  # comes from user inputs
+    # )
+    # return circ_supply
+    return cs_dict['circ_supply'][day_idx]
 
 @jax.jit
 def _use_as(arggs):
     cs_dict, day_idx = arggs
-    # as = cs + locked
-    available_supply = (
-        cs_dict["disbursed_reserve"][day_idx]  # from initialise_circulating_supply_df
-        + cs_dict["cum_network_reward"][day_idx]  # from the minting_model
-        + cs_dict["total_vest"][day_idx]  # from vesting_model
-        - cs_dict["network_gas_burn"][day_idx]  # comes from user inputs
-    )
-    return available_supply
+    # # as = cs + locked
+    # available_supply = (
+    #     cs_dict["disbursed_reserve"][day_idx]  # from initialise_circulating_supply_df
+    #     + cs_dict["cum_network_reward"][day_idx]  # from the minting_model
+    #     + cs_dict["total_vest"][day_idx]  # from vesting_model
+    #     - cs_dict["network_gas_burn"][day_idx]  # comes from user inputs
+    # )
+    # return available_supply
+    return cs_dict['available_supply'][day_idx]
 
 @jax.jit
 def update_cs_day(carry, x):
     # Compute daily change in initial pledge collateral
-    day_idx, current_day_idx, cs_dict, known_scheduled_pledge_release_vec, circ_supply, \
+    day_idx, current_day_idx, cs_dict, known_scheduled_pledge_release_vec, circ_supply, available_supply, \
         daily_burnt_fil, len_burnt_fil_vec, renewal_rate_vec, duration, lock_target, \
         gamma_vec, gamma_weight_type_vec, use_available_supply = carry
+
+    # pledge_input_configured = lax.cond(
+    #     use_available_supply,
+    #     _use_as,
+    #     _use_cs,
+    #     (cs_dict, day_idx)
+    # )
+    # pledge_input_configured = circ_supply
+    pledge_input_configured = jnp.where(use_available_supply, available_supply, circ_supply)
 
     day_pledge_locked_vec = cs_dict["day_locked_pledge"]
     scheduled_pledge_release = get_day_schedule_pledge_release(
@@ -76,7 +110,8 @@ def update_cs_day(carry, x):
     )
     pledge_delta = compute_day_delta_pledge(
         cs_dict["day_network_reward"][day_idx],
-        circ_supply,
+        # circ_supply,
+        pledge_input_configured,
         cs_dict["day_onboarded_power_QAP_PIB"][day_idx],
         cs_dict["day_renewed_power_QAP_PIB"][day_idx],
         cs_dict["network_QAP_EIB"][day_idx],
@@ -90,7 +125,8 @@ def update_cs_day(carry, x):
     # Get total locked pledge (needed for future day_locked_pledge)
     day_locked_pledge, day_renewed_pledge = compute_day_locked_pledge(
         cs_dict["day_network_reward"][day_idx],
-        circ_supply,
+        # circ_supply,
+        pledge_input_configured,
         cs_dict["day_onboarded_power_QAP_PIB"][day_idx],
         cs_dict["day_renewed_power_QAP_PIB"][day_idx],
         cs_dict["network_QAP_EIB"][day_idx],
@@ -134,21 +170,33 @@ def update_cs_day(carry, x):
     cs_dict["network_gas_burn"] = cs_dict["network_gas_burn"].at[day_idx].set(gas_burn_val)
 
     # Find circulating supply balance and update
-    circ_supply = lax.cond(
-        use_available_supply,
-        _use_as,
-        _use_cs,
-        (cs_dict, day_idx)
+    # circ_supply = lax.cond(
+    #     use_available_supply,
+    #     _use_as,
+    #     _use_cs,
+    #     (cs_dict, day_idx)
+    # )
+    circ_supply = (
+        cs_dict["disbursed_reserve"][day_idx]  # from initialise_circulating_supply_df
+        + cs_dict["cum_network_reward"][day_idx]  # from the minting_model
+        + cs_dict["total_vest"][day_idx]  # from vesting_model
+        - cs_dict["network_locked"][day_idx]  # from simulation loop
+        - cs_dict["network_gas_burn"][day_idx]  # comes from user inputs
     )
+    available_supply = circ_supply - cs_dict["network_locked"][day_idx]
     circ_supply = jnp.maximum(circ_supply, 0)
+    available_supply = jnp.maximum(available_supply, 0)
+    
     cs_dict["circ_supply"] = cs_dict["circ_supply"].at[day_idx].set(circ_supply)
-
+    cs_dict["available_supply"] = cs_dict["available_supply"].at[day_idx].set(available_supply)
+    
     return_carry = (
         day_idx + 1,
         current_day_idx,
         cs_dict,
         known_scheduled_pledge_release_vec,
         circ_supply,
+        available_supply,
         daily_burnt_fil,
         len_burnt_fil_vec,
         renewal_rate_vec,
@@ -194,6 +242,7 @@ def forecast_circulating_supply(
         mint_dict,
     )
     circ_supply = circ_supply_zero
+    available_supply = circ_supply_zero - locked_fil_zero
     sim_len = end_day - start_day
     assert len(renewal_rate_vec) == sim_len, "renewal_rate must be of length sim_len = len(historical_data) + forecast_length = {sim_len}"
     assert len(lock_target) == sim_len, "lock_target vec must be of length sim_len = len(historical_data) + forecast_length = {sim_len}"
@@ -201,7 +250,7 @@ def forecast_circulating_supply(
     day_idx_start = 1
     current_day_idx = current_day - start_day
     init_in = (day_idx_start, current_day_idx, cs_dict, known_scheduled_pledge_release_vec, 
-               circ_supply, daily_burnt_fil, len(burnt_fil_vec), renewal_rate_vec, duration, 
+               circ_supply, available_supply, daily_burnt_fil, len(burnt_fil_vec), renewal_rate_vec, duration, 
                lock_target, gamma, gamma_weight_type, use_available_supply)
     ret, _ = lax.scan(update_cs_day, init_in, None, length=sim_len)
     # ret, _ = imitate_lax.scan(update_cs_day, init_in, None, length=sim_len-1)  # for debugging and seeing print statements
@@ -233,6 +282,8 @@ def initialise_circulating_supply_dict(
     network_locked = network_locked.at[0].set(locked_fil_zero)
     circ_supply = jnp.zeros(len_sim)
     circ_supply = circ_supply.at[0].set(circ_supply_zero)
+    available_supply = jnp.zeros(len_sim)
+    available_supply = available_supply.at[0].set(circ_supply_zero - locked_fil_zero)
 
     network_gas_burn = jnp.zeros(len_sim)
     network_gas_burn = network_gas_burn.at[:len(burnt_fil_vec)].set(burnt_fil_vec)
@@ -240,6 +291,7 @@ def initialise_circulating_supply_dict(
     cs_dict = {
         "days": np.arange(start_day, end_day),
         "circ_supply": circ_supply,
+        "available_supply": circ_supply,
         "network_gas_burn": network_gas_burn,
         "day_locked_pledge": jnp.zeros(len_sim),
         "day_renewed_pledge": jnp.zeros(len_sim),
