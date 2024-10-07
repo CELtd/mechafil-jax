@@ -194,6 +194,7 @@ def forecast_power_stats(
         - total_qa_scheduled_expire_power
         + total_qa_renewed_power
     )
+    qa_total_power = jnp.minimum(qa_total_power, fil_plus_m*rb_total_power) # QA power should never be greater than FILPx RB power
 
     # put everything into a dictionary and return
     rb_dict = {
