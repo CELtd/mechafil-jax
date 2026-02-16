@@ -88,6 +88,7 @@ def run_sim(
     init_baseline_eib = data["init_baseline_eib"]
     circ_supply_zero = data["circ_supply_zero"]
     locked_fil_zero = data["locked_fil_zero"]
+    locked_reward_zero = data.get("locked_reward_zero", locked_fil_zero / 2.0)
     daily_burnt_fil = data["daily_burnt_fil"]
     burnt_fil_vec = data["burnt_fil_vec"]
     historical_renewal_rate = data["historical_renewal_rate"]
@@ -169,6 +170,7 @@ def run_sim(
         lock_target=full_lock_target_vec,
         gamma=full_gamma_vec,
         use_available_supply=use_available_supply,
+        locked_reward_zero=locked_reward_zero,
     )
 
     # collate results

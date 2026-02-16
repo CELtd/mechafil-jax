@@ -164,6 +164,7 @@ def forecast_circulating_supply(
     lock_target: Union[jnp.array, NDArray],
     gamma: Union[jnp.array, NDArray],
     use_available_supply: bool = False,
+    locked_reward_zero: float = None,
 ) -> Dict:
     # we assume all stats started at main net launch, in 2020-10-15
     start_day = datetime64_delta_to_days(start_date - NETWORK_START)
@@ -178,6 +179,7 @@ def forecast_circulating_supply(
         burnt_fil_vec,
         vest_dict,
         mint_dict,
+        locked_reward_zero=locked_reward_zero,
     )
     circ_supply = circ_supply_zero
     available_supply = circ_supply_zero - locked_fil_zero
@@ -206,16 +208,19 @@ def initialise_circulating_supply_dict(
     burnt_fil_vec: Union[jnp.array, NDArray],
     vest_dict: Dict,
     mint_dict: Dict,
+    locked_reward_zero: float = None,
 ) -> Dict:
     # we assume days start at main net launch, in 2020-10-15
     start_day = datetime64_delta_to_days(start_date - NETWORK_START)
     end_day = datetime64_delta_to_days(end_date - NETWORK_START)
     len_sim = end_day - start_day
 
+    reward_zero = locked_reward_zero if locked_reward_zero is not None else locked_fil_zero / 2.0
+    pledge_zero = locked_fil_zero - reward_zero
     network_locked_pledge = jnp.zeros(len_sim)
-    network_locked_pledge = network_locked_pledge.at[0].set(locked_fil_zero / 2.0)
+    network_locked_pledge = network_locked_pledge.at[0].set(pledge_zero)
     network_locked_reward = jnp.zeros(len_sim)
-    network_locked_reward = network_locked_reward.at[0].set(locked_fil_zero / 2.0)
+    network_locked_reward = network_locked_reward.at[0].set(reward_zero)
     network_locked = jnp.zeros(len_sim)
     network_locked = network_locked.at[0].set(locked_fil_zero)
     circ_supply = jnp.zeros(len_sim)

@@ -1,7 +1,28 @@
-from datetime import date
+from datetime import date, timedelta
 import pystarboard.data as data
 
 import mechafil_jax.constants as C
+
+
+def _estimate_locked_reward(start_date):
+    """Estimate network_locked_reward at start_date from minting history.
+
+    Uses the actual reward locking model:
+      locked_rewards += 0.75 * daily_reward
+      locked_rewards -= locked_rewards / 180
+
+    Needs ~180 days of minting history to converge.
+    """
+    lookback = 200  # days before start_date
+    fetch_start = start_date - timedelta(days=lookback)
+    stats_df = data.query_supply_stats(fetch_start, start_date)
+    stats_df = stats_df.sort_values('date')
+    daily_reward = stats_df["mined_fil"].astype(float).diff().dropna().values
+
+    locked_reward = 0.0
+    for dr in daily_reward:
+        locked_reward += 0.75 * dr - locked_reward / 180.0
+    return locked_reward
 
 def get_simulation_data(bearer_token_or_auth_file:str, 
                         start_date:date, current_date:date, end_date:date):
@@ -32,6 +53,8 @@ def get_simulation_data(bearer_token_or_auth_file:str,
     burnt_fil_vec = fil_stats_df["burnt_fil"].values
     historical_renewal_rate = fil_stats_df["rb_renewal_rate"].values[:-1]
 
+    locked_reward_zero = _estimate_locked_reward(start_date)
+
     data_dict = {
         "rb_power_zero": rb_power_zero,
         "qa_power_zero": qa_power_zero,
@@ -56,6 +79,7 @@ def get_simulation_data(bearer_token_or_auth_file:str,
         "daily_burnt_fil": daily_burnt_fil,
         "burnt_fil_vec": burnt_fil_vec,
         "historical_renewal_rate": historical_renewal_rate,
+        "locked_reward_zero": locked_reward_zero,
     }
 
     return data_dict
