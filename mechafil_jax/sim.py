@@ -41,11 +41,11 @@ def run_sim(
     Parameters:
     -----------
     rb_onboard_power: jnp.array
-        The raw power onboarded to the network, in EiB.
+        The raw power onboarded to the network, in PiB.
     renewal_rate: jnp.array
-        The renewal rate of the network, in EiB/day.
+        The fraction of scheduled-to-expire sectors that are renewed each day (dimensionless, 0.0-1.0).
     fil_plus_rate: jnp.array
-        The FIL+ rate of the network, in EiB/day.
+        The fraction of daily onboarded power that is FIL+ verified (dimensionless, 0.0-1.0).
     lock_target: Union[float, jnp.array]
         The target lock ratio of the network. If a float, then the lock target is constant across the simulation. If it is
         a jnp.array, then it must be of length `forecast_length` and the lock target can be time-varying.  This applies to the
